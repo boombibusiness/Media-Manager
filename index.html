@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Media Manager</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #050505; color: #ffffff; display: flex; justify-content: center; padding: 50px; margin: 0; overflow-x: hidden; }
+        
+        .halftone-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-image: radial-gradient(circle, #ffffff 2px, transparent 2.5px);
+            background-size: 16px 16px; opacity: 0.08;
+            mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 65%);
+            -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 65%);
+            pointer-events: none; z-index: -1;
+            animation: moveHalftone 15s linear infinite;
+        }
+        @keyframes moveHalftone { 0% { background-position: 0 0; } 100% { background-position: 16px 16px; } }
+
+        /* SLEEK LOADING WIDGET OVERLAY */
+        #loadingOverlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(5, 5, 5, 0.6); backdrop-filter: blur(5px); z-index: 9999;
+            display: flex; align-items: center; justify-content: center; transition: opacity 0.2s ease;
+        }
+        .loading-box {
+            background: #111; border: 1px solid #333; padding: 30px 50px; border-radius: 12px;
+            display: flex; flex-direction: column; align-items: center; gap: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .spinner {
+            width: 35px; height: 35px; border: 3px solid #333; border-top: 3px solid #aec6cf;
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .container { width: 100%; max-width: 850px; display: flex; flex-direction: column; gap: 20px; z-index: 1; }
+        
+        h1, h2, h3 { font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin: 0; }
+        h1 { font-size: 26px; text-align: center; margin-bottom: 5px; }
+        
+        .main-tabs { display: flex; justify-content: center; gap: 15px; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 10px; }
+        .tab-btn { background: transparent; color: #888; border: none; font-size: 14px; font-weight: bold; letter-spacing: 2px; cursor: pointer; transition: 0.2s; padding: 5px 15px; border-radius: 6px; }
+        .tab-btn:hover { color: #fff; background: #111; }
+        .tab-btn.active { color: #fff; background: #222; box-shadow: inset 0 0 0 1px #444; }
+
+        .section { background: rgba(15, 15, 15, 0.8); border: 1px solid #333; border-radius: 12px; padding: 30px; backdrop-filter: blur(5px); position: relative; }
+        .hidden { display: none !important; }
+        
+        input[type="text"], input[type="search"], input[type="number"] { width: 100%; background: #0a0a0a; color: #fff; border: 1px solid #444; padding: 12px 15px; border-radius: 6px; font-size: 14px; outline: none; transition: 0.2s; box-sizing: border-box; }
+        input[type="text"]:focus, input[type="search"]:focus, input[type="number"]:focus { border-color: #fff; }
+        
+        button { background: #ffffff; color: #000000; border: none; padding: 12px 20px; font-weight: bold; font-size: 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #cccccc; transform: translateY(-2px); }
+        .btn-outline { background: transparent; color: #fff; border: 1px solid #fff; text-transform: uppercase;}
+        .btn-outline:hover { background: #fff; color: #000; }
+        .btn-outline.danger:hover { background: #ff5555; color: #fff; border-color: #ff5555; }
+        
+        .icon-btn { padding: 8px 12px; font-size: 14px; background: #222; color: #aaa; border-radius: 6px; border: 1px solid #333; }
+        .icon-btn:hover { background: #444; color: #fff; transform: translateY(-2px); }
+        .icon-btn.danger:hover { background: #ff4444; color: #fff; border-color: #ff4444; }
+
+        .sort-dropdown { background: #0a0a0a; color: #aaa; border: 1px solid #333; padding: 6px 10px; border-radius: 6px; font-size: 11px; outline: none; cursor: pointer; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; transition: 0.2s; }
+        .sort-dropdown:hover { border-color: #fff; color: #fff; }
+
+        .flex-row { display: flex; gap: 15px; align-items: center; }
+        .flex-row input { flex: 1; margin: 0; }
+        
+        .path-display { font-family: monospace; font-size: 11px; color: #888; margin-top: 10px; word-break: break-all; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 15px; }
+        
+        /* Grid and Perfectly Padded Nested Folders */
+        .grid { display: flex; flex-direction: column; gap: 15px; margin-top: 15px; transition: 0.3s; }
+        .folder-group { display: flex; flex-direction: column; gap: 15px; }
+        
+        /* Pure CSS nested padding stops horizontal overflow dynamically AND syncs the exact 25px gap */
+        .nested-container { display: none; width: 100%; flex-direction: column; gap: 15px; padding-left: 25px; border-left: 2px solid #333; box-sizing: border-box; grid-column: 1 / -1; }
+        .nested-container.open { display: flex; }
+        
+        .btn-wrapper { display: flex; gap: 5px; align-items: stretch; background: #111; border: 1px solid #333; border-radius: 6px; padding: 5px; transition: 0.2s; cursor: grab; }
+        .btn-wrapper:active { cursor: grabbing; border-color: #fff; }
+        
+        .drag-over { background: #1a2529 !important; border-color: #aec6cf !important; }
+        .drag-top { border-top: 3px solid #aec6cf !important; border-top-left-radius: 2px; border-top-right-radius: 2px; }
+        .drag-bottom { border-bottom: 3px solid #aec6cf !important; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }
+        .drag-left { border-left: 3px solid #aec6cf !important; border-top-left-radius: 2px; border-bottom-left-radius: 2px; }
+        .drag-right { border-right: 3px solid #aec6cf !important; border-top-right-radius: 2px; border-bottom-right-radius: 2px; }
+        
+        .main-btn { flex: 1; background: transparent; color: #fff; text-align: left; padding: 10px 15px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; flex-direction: column; justify-content: center; gap: 4px;}
+        .main-btn:hover { background: #222; color: #fff; transform: none; }
+
+        /* Media Logs Grid */
+        .logs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 100px;}
+        .log-card { background: #111; border: 1px solid #333; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px; position: relative; transition: 0.2s; cursor: grab; box-sizing: border-box; }
+        .log-card:active { cursor: grabbing; border-color: #fff; }
+        
+        /* Renamable Title Styling */
+        .log-title { font-weight: bold; font-size: 14px; letter-spacing: 1px; color: #aec6cf; text-transform: uppercase; cursor: pointer; transition: 0.2s; width: max-content; user-select: none; }
+        .log-title:hover { color: #ffffff; text-shadow: 0 0 5px rgba(255,255,255,0.3); }
+        .log-date { font-size: 11px; color: #888; margin-bottom: 5px; font-family: monospace; pointer-events: none; }
+        
+        .log-img-box { width: 100%; height: 220px; background: #0a0a0a; border: 2px dashed #444; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; transition: 0.2s; color: #555; font-size: 12px; }
+        .log-img-box:hover { border-color: #fff; color: #fff; background: #1a1a1a; }
+        .log-img-box:focus { border-color: #aec6cf; box-shadow: 0 0 8px rgba(174, 198, 207, 0.4); outline: none; color: #fff; background: #1a1a1a; }
+        
+        .log-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+        .log-actions { position: absolute; top: 15px; right: 15px; display: flex; gap: 8px; align-items: center; z-index: 10; }
+        .log-clear-btn { background: transparent; border: 1px solid #ff5555; color: #ff5555; padding: 4px 8px; font-size: 10px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .log-clear-btn:hover { background: #ff5555; color: #fff; }
+
+        /* Settings Gear & Modal */
+        #settingsBtn { position: fixed; bottom: 20px; left: 0; width: 45px; height: 40px; background: #0a0a0a; border: 1px solid #333; border-left: none; border-radius: 0 8px 8px 0; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; color: #888; transition: 0.2s; z-index: 101; padding: 0; }
+        #settingsBtn:hover { color: #fff; background: #111; width: 55px; }
+        
+        .settings-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 300; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .settings-content { background: #111; border: 1px solid #333; border-radius: 12px; padding: 35px; width: 420px; max-height: 90vh; overflow-y: auto; }
+        .settings-content h3 { color: #aec6cf; margin-top: 0; margin-bottom: 25px; border-bottom: 1px solid #222; padding-bottom: 15px; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 15px; }
+        .setting-row input[type="checkbox"] { accent-color: #aec6cf; width: 18px; height: 18px; cursor: pointer; }
+        .browser-dropdown { width: 130px; background: #0a0a0a; color: #fff; border: 1px solid #444; padding: 6px; border-radius: 6px; font-size: 11px; outline: none; }
+
+        /* Custom Context Menu */
+        #textContextMenu {
+            position: fixed; background: #111; border: 1px solid #333; border-radius: 6px; padding: 4px;
+            z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column;
+        }
+        #textContextMenu button {
+            background: transparent; color: #fff; border: none; padding: 8px 16px; font-size: 11px;
+            cursor: pointer; text-align: left; border-radius: 4px; font-weight: bold;
+        }
+        #textContextMenu button:hover { background: #222; color: #aec6cf; }
+
+        /* Favorites Panel */
+        #favPanel { position: fixed; top: 0; left: -320px; width: 320px; height: 100vh; background: #0a0a0a; border-right: 1px solid #333; transition: left 0.3s ease; z-index: 100; box-shadow: 5px 0 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
+        #favPanel.open { left: 0; }
+        #favTab { position: absolute; right: -40px; top: 50%; transform: translateY(-50%); width: 40px; height: 140px; background: #0a0a0a; border: 1px solid #333; border-left: none; border-radius: 0 8px 8px 0; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; text-orientation: mixed; font-weight: bold; font-size: 12px; letter-spacing: 2px; color: #888; cursor: pointer; transition: 0.2s; user-select: none; }
+        #favTab:hover { color: #fff; background: #111; }
+
+        /* Output Sliding Panel */
+        #outputPanel { position: fixed; top: 0; right: -400px; width: 400px; height: 100vh; background: #0a0a0a; border-left: 1px solid #333; transition: right 0.3s ease; z-index: 100; box-shadow: -5px 0 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
+        #outputPanel.open { right: 0; }
+        #outputTab { position: absolute; left: -40px; top: 50%; transform: translateY(-50%) rotate(180deg); width: 40px; height: 120px; background: #0a0a0a; border: 1px solid #333; border-right: none; border-radius: 0 8px 8px 0; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; text-orientation: mixed; font-weight: bold; font-size: 12px; letter-spacing: 2px; color: #888; cursor: pointer; transition: 0.2s; user-select: none; }
+        #outputTab:hover { color: #fff; background: #111; }
+        
+        .progress-container { width: calc(100% - 40px); height: 4px; background: #222; margin: 20px; border-radius: 2px; overflow: hidden; }
+        #progressBar { width: 0%; height: 100%; background: linear-gradient(90deg, #aec6cf, #7b9ba6); transition: width 0.2s ease; box-shadow: 0 0 10px rgba(174, 198, 207, 0.5); }
+        #statusLog { flex: 1; padding: 20px; font-family: monospace; font-size: 11px; color: #aaa; overflow-y: auto; overflow-x: hidden; word-wrap: break-word; }
+        .log-error { color: #ff6b6b; }
+        .log-success { color: #aec6cf; }
+        .log-warn { color: #e5c07b; }
+
+        /* Bottom Input Sliding Panel */
+        #inputPanel { position: fixed; bottom: -160px; left: 0; width: 100%; height: 160px; background: #0a0a0a; border-top: 1px solid #333; transition: bottom 0.3s ease; z-index: 90; display: flex; justify-content: center; align-items: center; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
+        #inputPanel.open { bottom: 0; }
+        #inputTab { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 140px; height: 30px; background: #0a0a0a; border: 1px solid #333; border-bottom: none; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; letter-spacing: 2px; color: #888; cursor: pointer; transition: 0.2s; user-select: none; }
+        #inputTab:hover { color: #fff; background: #111; }
+        
+        .input-container { width: 100%; max-width: 800px; display: flex; gap: 15px; padding: 0 20px; height: 120px; align-items: stretch; }
+        .input-column { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+        #links { flex: 1; resize: none; margin: 0; box-sizing: border-box; background: #0a0a0a; color: #fff; border: 1px solid #444; padding: 12px 15px; border-radius: 8px; font-size: 13px; outline: none; transition: border-color 0.2s, background 0.2s; }
+        #links:focus { border-color: #fff; }
+        #links.hover { border-color: #fff; background: #111; }
+        #customNameInput { height: 40px; box-sizing: border-box; background: #0a0a0a; color: #fff; border: 1px solid #444; padding: 10px 15px; border-radius: 8px; font-size: 12px; outline: none; transition: border-color 0.2s; }
+        #customNameInput:focus { border-color: #fff; }
+        #dropZone { flex: 1; margin: 0; box-sizing: border-box; border: 2px dashed #666; background: #0a0a0a; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #888; font-size: 13px; cursor: pointer; transition: 0.2s; overflow: hidden; text-align: center; padding: 15px; }
+        #dropZone.hover { border-color: #fff; color: #fff; background: #111; }
+    </style>
+</head>
+<body>
+
+<div class="halftone-overlay"></div>
+
+<!-- ASYNC LOADING WIDGET OVERLAY -->
+<div id="loadingOverlay" class="hidden">
+    <div class="loading-box">
+        <div class="spinner"></div>
+        <h3 id="loadingText" style="color: #aec6cf; letter-spacing: 2px; margin: 0; font-size: 13px;">SYNCING FILES...</h3>
+    </div>
+</div>
+
+<!-- FULL IMAGE LIGHTBOX MODAL -->
+<div id="imageModal" class="settings-modal hidden" style="z-index: 500; cursor: pointer;" onclick="this.classList.add('hidden')">
+    <img id="fullSizeImage" src="" style="max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
+</div>
+
+<!-- CUSTOM PASTE CONTEXT MENU -->
+<div id="textContextMenu" class="hidden">
+    <button onclick="pasteFromContextMenu()">Paste</button>
+</div>
+
+<button id="settingsBtn" onclick="document.getElementById('settingsModal').classList.remove('hidden')" title="Open App Settings">⚙️</button>
+<input type="file" id="hiddenFileInput" style="display: none;">
+
+<!-- UNIVERSAL CONFIRM MODAL -->
+<div id="confirmModal" class="settings-modal hidden" style="z-index: 400;">
+    <div class="settings-content" style="width: 350px; text-align: center;">
+        <h3 id="confirmTitle" style="border: none; margin-bottom: 10px; font-size: 18px; color: #ff5555;">Confirm</h3>
+        <p id="confirmText" style="font-size: 13px; color: #ccc; margin-bottom: 25px;">Are you sure?</p>
+        <div style="display: flex; gap: 10px;">
+            <button id="confirmBtn" onclick="executeConfirmAction()" style="flex: 1; background: #4a1515; color: #ff9999; border: 1px solid #ff5555;">Confirm</button>
+            <button class="btn-outline" onclick="closeConfirmModal()" style="flex: 1;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- NEW TRACKING SLOT MODAL -->
+<div id="promptModal" class="settings-modal hidden" style="z-index: 400;">
+    <div class="settings-content" style="width: 380px; text-align: center;">
+        <h3 style="border: none; margin-bottom: 10px; font-size: 18px; color: #aec6cf;">New Tracking Slot</h3>
+        <input type="text" id="promptInput" placeholder="Enter platform name..." style="margin-bottom: 25px; text-align: center;" onkeypress="if(event.key === 'Enter') executeAddSlot('top')">
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <button class="btn-outline" onclick="executeAddSlot('top')" style="flex: 1; border-color: #aec6cf; color: #aec6cf;">+ Top</button>
+            <button class="btn-outline" onclick="executeAddSlot('bottom')" style="flex: 1; border-color: #7b9ba6; color: #7b9ba6;">+ Bottom</button>
+        </div>
+        <button class="btn-outline" onclick="document.getElementById('promptModal').classList.add('hidden')" style="width: 100%; border-color: #444; color: #888;">Cancel</button>
+    </div>
+</div>
+
+<!-- RENAME TRACKING SLOT MODAL -->
+<div id="renameModal" class="settings-modal hidden" style="z-index: 400;">
+    <div class="settings-content" style="width: 380px; text-align: center;">
+        <h3 style="border: none; margin-bottom: 10px; font-size: 18px; color: #aec6cf;">Rename Tracking Slot</h3>
+        <input type="text" id="renameInput" placeholder="Enter new name..." style="margin-bottom: 25px; text-align: center;" onkeypress="if(event.key === 'Enter') executeRenameSlot()">
+        <div style="display: flex; gap: 10px;">
+            <button onclick="executeRenameSlot()" style="flex: 1; background: #aec6cf; color: #000;">Save</button>
+            <button class="btn-outline" onclick="document.getElementById('renameModal').classList.add('hidden')" style="flex: 1;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal (HORIZONTAL SPLIT) -->
+<div id="settingsModal" class="settings-modal hidden">
+    <div class="settings-content" style="width: 780px; max-width: 90vw; padding: 40px;">
+        
+        <div style="display: flex; gap: 40px;">
+            
+            <!-- LEFT COLUMN: SETTINGS -->
+            <div style="flex: 1; border-right: 1px dashed #333; padding-right: 40px;">
+                <h3>Settings</h3>
+                <div class="setting-row">
+                    <span style="font-size: 13px; color: #ccc;">Keep Window Always on Top</span>
+                    <input type="checkbox" id="alwaysOnTopToggle" onchange="saveSettings(); applyAlwaysOnTop();">
+                </div>
+                <div class="setting-row">
+                    <span style="font-size: 13px; color: #ccc;">Isolate Media (Single Photo/Vid)</span>
+                    <input type="checkbox" id="isolateToggle" onchange="saveSettings()">
+                </div>
+                <div class="setting-row">
+                    <span style="font-size: 13px; color: #ccc;">Bring Opened Folders to Front</span>
+                    <input type="checkbox" id="focusExplorerToggle" onchange="saveSettings()">
+                </div>
+                <div class="setting-row">
+                    <span style="font-size: 13px; color: #ccc;">Auto-open Output Panel</span>
+                    <input type="checkbox" id="autoOutputToggle" onchange="saveSettings()">
+                </div>
+                <div class="setting-row">
+                    <span style="font-size: 13px; color: #ccc;">Copy Local Files instead of Moving</span>
+                    <input type="checkbox" id="copyFilesToggle" onchange="saveSettings()">
+                </div>
+                <div class="setting-row">
+                    <span style="font-size: 13px; color: #ccc;">Auto-Delete Extracted ZIPs</span>
+                    <input type="checkbox" id="autoDeleteZipToggle" onchange="saveSettings()">
+                </div>
+                
+                <div class="setting-row">
+                    <span style="font-size: 13px; color: #ccc;">Auto-Sync Limits (Global Bins)</span>
+                    <div style="display:flex; gap:10px; align-items: center;">
+                        <div style="display:flex; align-items:center; gap:5px;" title="Max files to auto-sync">
+                            <span style="font-size:10px; color:#888;">FILES</span>
+                            <input type="number" id="syncLimitFiles" style="width:60px; padding:6px; font-size:11px;" onchange="saveSettings()">
+                        </div>
+                        <div style="display:flex; align-items:center; gap:5px;" title="Max size in MB to auto-sync">
+                            <span style="font-size:10px; color:#888;">MB</span>
+                            <input type="number" id="syncLimitMB" style="width:60px; padding:6px; font-size:11px;" onchange="saveSettings()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-row" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
+                    <span style="font-size: 13px; color: #ccc;">Primary Browser (For Logins)</span>
+                    <select id="browserSelect" class="browser-dropdown" onchange="saveSettings()">
+                        <option value="chrome">Chrome</option>
+                        <option value="firefox">Firefox</option>
+                        <option value="edge">Edge</option>
+                        <option value="brave">Brave</option>
+                        <option value="opera">Opera</option>
+                        <option value="safari">Safari</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: HELP & INFO -->
+            <div style="flex: 1;">
+                <h3>Help & Info</h3>
+                <div style="font-size: 12px; color: #aaa; line-height: 1.8; text-align: left; background: #0a0a0a; padding: 25px; border-radius: 8px; border: 1px solid #222;">
+                    <span style="color: #fff; font-weight: bold;">Video Tutorial:</span><br>Watch this guide for all the available functions:<br>
+                    <!-- TUTORIAL LINK SLOT -->
+                    <a href="#" style="color: #aec6cf; text-decoration: none; word-break: break-all;">[INSERT LINK HERE]</a>
+                    
+                    <br><br>
+                    
+                    <span style="color: #fff; font-weight: bold;">Supported Platforms:</span><br>
+                    YouTube, X / Twitter, Instagram, Weverse, Pinterest, TikTok
+                    
+                    <br><br>
+                    
+                    <span style="color: #fff; font-weight: bold;">Contact / Bugs / Requests:</span><br>
+                    IG: @boomb.i_<br>
+                    Email: boomb.ibusiness@gmail.com
+                    
+                    <br><br>
+                    
+                    <span style="color: #e5c07b; font-weight: bold;">Note:</span> TikTok downloads can occasionally be inconsistent due to anti-scraping systems. If a download fails, simply retry the link.
+                </div>
+            </div>
+
+        </div>
+
+        <button onclick="document.getElementById('settingsModal').classList.add('hidden')" style="width: 100%; margin-top: 35px;">Close Settings</button>
+    </div>
+</div>
+
+<!-- Favorites Panel -->
+<div id="favPanel">
+    <div id="favTab" onclick="toggleFavs()" title="Open Global Bins">GLOBAL BINS</div>
+    <div style="padding: 20px; border-bottom: 1px solid #333; display: flex; flex-direction: column; gap: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <h3 style="color: #aec6cf; margin: 0;">Global Bins</h3>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <button class="icon-btn" style="padding: 2px 6px; font-size: 12px; background: transparent; border: none; color: #888;" onclick="showLoading(() => renderFavorites(true), 'SYNCING BINS...')" title="Force Refresh Bins & File Counts">🔄</button>
+                    <div title="Large bins pause auto-sync to prevent lag. Downloads work perfectly, but file counts require a manual refresh. Adjust limits in Settings." style="cursor: help; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #888; font-weight: bold; margin-left: 2px;">?</div>
+                </div>
+            </div>
+            <button class="btn-outline" style="padding: 6px 12px; font-size: 10px;" onclick="addFavorite()" title="Add a folder to Global Bins">+ ADD</button>
+        </div>
+        <select id="favSort" class="sort-dropdown" onchange="saveFilters(); renderFavorites();" style="width: 100%;">
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="az">A-Z</option>
+            <option value="za">Z-A</option>
+            <option value="sizeHigh">Largest Size</option>
+            <option value="filesHigh">Most Files</option>
+            <option value="custom">Custom Order</option>
+        </select>
+    </div>
+    <div id="favGrid" style="padding: 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto;"></div>
+</div>
+
+<!-- Output Panel -->
+<div id="outputPanel">
+    <div id="outputTab" onclick="toggleOutput()" title="Toggle Output Log">OUTPUT</div>
+    <h3 style="padding: 20px 20px 0 20px; font-size: 12px; color: #aec6cf;">Live Output</h3>
+    <div class="progress-container"><div id="progressBar"></div></div>
+    <div id="statusLog">> System ready. Awaiting inputs...</div>
+</div>
+
+<!-- Bottom Input Panel -->
+<div id="inputPanel">
+    <div id="inputTab" onclick="toggleInput()" title="Toggle Media Injector">MEDIA INPUT</div>
+    <div class="input-container">
+        <div class="input-column">
+            <textarea id="links" placeholder="Drag & Drop, or Paste highlighted link here..."></textarea>
+            <input type="text" id="customNameInput" placeholder="Override Name (Optional)...">
+        </div>
+        <div id="dropZone" title="Click to open file explorer">Click to browse, or<br>Drag & Drop ZIP / Local File</div>
+    </div>
+</div>
+
+<div class="container">
+    <h1>MEDIA MANAGER</h1>
+    
+    <div class="main-tabs">
+        <button id="tab-downloader" class="tab-btn active" onclick="switchMainTab('downloader')">MEDIA DOWNLOADER</button>
+        <button id="tab-logs" class="tab-btn" onclick="switchMainTab('logs')">MEDIA LOGS</button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 1: MEDIA LOGS                          -->
+    <!-- ========================================== -->
+    <div id="logsView" class="hidden">
+        <div class="header-bar">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <h3 style="margin: 0;">Tracking Slots</h3>
+                <select id="logSort" class="sort-dropdown" onchange="saveFilters(); renderLogs();">
+                    <option value="custom">Custom Order</option>
+                    <option value="newest">Recently Updated</option>
+                    <option value="az">A-Z</option>
+                    <option value="za">Z-A</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-outline" style="padding: 6px 12px; font-size: 10px;" onclick="addCustomLogSlot()" title="Add a new custom tracking slot">+ Custom Slot</button>
+                <button class="btn-outline danger" style="padding: 6px 12px; font-size: 10px;" onclick="showCustomConfirm('Clear All Logs', 'Are you sure you want to clear ALL images and completion data from every slot?', 'Clear All', 'clearAllLogs', null, true)" title="Clear all log images and dates">Clear All</button>
+            </div>
+        </div>
+        <div id="logsGrid" class="logs-grid"></div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: MEDIA DOWNLOADER (Core App)         -->
+    <!-- ========================================== -->
+    <div id="downloaderView">
+        <!-- STATE 1: SETUP -->
+        <div id="setupSection" class="section">
+            <h3>1. Select Workspace</h3>
+            <p style="font-size: 13px; color: #aaa;">Select the master parent folder where all projects are stored.</p>
+            <button class="btn-outline" onclick="selectParentFolder()" style="width: 100%;">Browse Parent Folder</button>
+            <div id="parentPathDisplay" class="path-display">No folder selected.</div>
+        </div>
+
+        <!-- STATE 2: PROJECTS -->
+        <div id="projectSelectionSection" class="section hidden">
+            <div class="header-bar">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <h3 style="margin: 0;">Projects</h3>
+                    <select id="projectSort" class="sort-dropdown" onchange="saveFilters(); loadProjects();">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="az">A-Z</option>
+                        <option value="za">Z-A</option>
+                        <option value="sizeHigh">Largest Size</option>
+                        <option value="filesHigh">Most Files</option>
+                        <option value="custom">Custom Order</option>
+                    </select>
+                </div>
+                <button class="btn-outline" style="padding: 6px 12px; font-size: 10px;" onclick="resetToSetup()">Change Workspace</button>
+            </div>
+            
+            <div class="flex-row" style="margin-bottom: 20px;">
+                <input type="text" id="projectNameInput" placeholder="Create New Project..." onkeypress="if(event.key === 'Enter') createProject()">
+                <button onclick="createProject()">Create</button>
+            </div>
+
+            <input type="search" id="projectSearch" placeholder="Search projects..." oninput="loadProjects()" style="margin-bottom: 25px;">
+            
+            <div id="existingProjectsGrid" class="grid"></div>
+        </div>
+
+        <!-- STATE 3: WORKSPACE -->
+        <div id="workspaceSection" class="section hidden">
+            <div class="header-bar">
+                <h3 id="activeProjectTitle" style="color: #aec6cf; margin: 0;">Project Name</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button class="icon-btn" onclick="openExplorer(activeProjectFolder)" title="Open Project in File Explorer">📂 OPEN</button>
+                    <button class="btn-outline" style="padding: 6px 12px; font-size: 10px;" onclick="showLoading(resetToProjects, 'SCANNING PROJECTS...')" title="Return to Projects List">Back</button>
+                </div>
+            </div>
+
+            <div class="header-bar" style="border: none; margin-bottom: 0; padding-bottom: 0;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <h3 style="margin: 0;">FOLDERS</h3>
+                    <select id="folderSort" class="sort-dropdown" onchange="saveFilters(); updateGridUI();">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="az">A-Z</option>
+                        <option value="za">Z-A</option>
+                        <option value="sizeHigh">Largest Size</option>
+                        <option value="filesHigh">Most Files</option>
+                        <option value="custom">Custom Order</option>
+                    </select>
+                    <button class="icon-btn" style="padding: 4px 8px; font-size: 12px; background: transparent; border: none;" onclick="showLoading(() => syncWorkspace(true), 'SYNCING FILES...')" title="Refresh Folders & File Counts">🔄</button>
+                </div>
+                <button class="btn-outline" style="padding: 6px 12px; font-size: 10px;" onclick="toggleAddFolder()" title="Create a new root folder">+ Add Folder</button>
+            </div>
+            
+            <div id="addFolderRow" class="flex-row hidden" style="margin-top: 15px; background: #111; padding: 12px; border-radius: 6px; border: 1px solid #333;">
+                <input type="text" id="newFolderInput" placeholder="New subfolder (e.g., Raw/B-Roll)..." style="background: #0a0a0a;" onkeypress="if(event.key === 'Enter') createSubfolder()">
+                <button onclick="createSubfolder()">Save</button>
+            </div>
+
+            <div id="folderGrid" class="grid" style="margin-bottom: 100px;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { ipcRenderer, shell } = require('electron');
+    const { spawn, exec } = require('child_process');
+    const path = require('path');
+    const fs = require('fs');
+
+    let parentFolder = "";
+    let activeProjectFolder = "";
+    let subfolders = [];
+    let favorites = JSON.parse(localStorage.getItem('md_favorites')) || [];
+    let openNestedFolders = new Set(); 
+    let stagedFile = "";
+    
+    // Unified Confirm Variables
+    let pendingAction = null;
+    let pendingData = null;
+    
+    let dragSourceType = null; 
+    let dragSourceId = null;
+    let cachedStats = JSON.parse(localStorage.getItem('md_cached_stats')) || {};
+    
+    let isOutputOpen = false;
+    let isInputOpen = false;
+    let isFavsOpen = false;
+
+    // --- ASYNC LOADING ENGINE ---
+    function showLoading(callback, message = "LOADING...") {
+        const overlay = document.getElementById('loadingOverlay');
+        document.getElementById('loadingText').innerText = message;
+        overlay.classList.remove('hidden');
+        overlay.style.opacity = '1';
+        
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    try {
+                        callback();
+                    } catch (err) {
+                        console.error("Loading Task Error:", err);
+                    } finally {
+                        overlay.style.opacity = '0';
+                        setTimeout(() => overlay.classList.add('hidden'), 300);
+                    }
+                }, 50);
+            });
+        });
+    }
+
+    // --- FILTER MEMORY ENGINE ---
+    function saveFilters() {
+        const filters = {
+            project: document.getElementById('projectSort').value,
+            folder: document.getElementById('folderSort').value,
+            fav: document.getElementById('favSort').value,
+            log: document.getElementById('logSort').value
+        };
+        localStorage.setItem('md_filters', JSON.stringify(filters));
+    }
+
+    function loadFilters() {
+        const filters = JSON.parse(localStorage.getItem('md_filters'));
+        if (filters) {
+            document.getElementById('projectSort').value = filters.project || 'newest';
+            document.getElementById('folderSort').value = filters.folder || 'newest';
+            document.getElementById('favSort').value = filters.fav || 'newest';
+            document.getElementById('logSort').value = filters.log || 'custom';
+        } else {
+            document.getElementById('projectSort').value = 'newest';
+            document.getElementById('folderSort').value = 'newest';
+            document.getElementById('favSort').value = 'newest';
+            document.getElementById('logSort').value = 'custom';
+        }
+    }
+
+    // --- INITIALIZATION HOOK ---
+    window.onload = () => {
+        loadSettings();
+        loadFilters();
+        
+        const savedWorkspace = localStorage.getItem('md_workspace');
+        if (savedWorkspace && fs.existsSync(savedWorkspace)) {
+            parentFolder = savedWorkspace;
+            document.getElementById('parentPathDisplay').innerText = `Workspace: ${parentFolder}`;
+            showLoading(() => {
+                renderFavorites();
+                loadProjects();
+            }, "LOADING WORKSPACE...");
+        } else {
+            renderFavorites();
+        }
+    };
+
+    // --- TAB SWITCHING SYSTEM ---
+    function switchMainTab(tab) {
+        document.getElementById('tab-downloader').classList.remove('active');
+        document.getElementById('tab-logs').classList.remove('active');
+        document.getElementById('downloaderView').classList.add('hidden');
+        document.getElementById('logsView').classList.add('hidden');
+
+        if (tab === 'downloader') {
+            document.getElementById('tab-downloader').classList.add('active');
+            document.getElementById('downloaderView').classList.remove('hidden');
+            if(activeProjectFolder) toggleInput(true);
+        } else {
+            document.getElementById('tab-logs').classList.add('active');
+            document.getElementById('logsView').classList.remove('hidden');
+            toggleInput(false); 
+            renderLogs();
+        }
+    }
+
+    // --- GLOBAL DRAG CLEANUP ---
+    document.addEventListener('dragend', () => {
+        dragSourceType = null;
+        dragSourceId = null;
+        document.querySelectorAll('.drag-over, .drag-top, .drag-bottom, .drag-left, .drag-right').forEach(el => {
+            el.classList.remove('drag-over', 'drag-top', 'drag-bottom', 'drag-left', 'drag-right');
+        });
+    });
+
+    // --- SAFE HEAVY METADATA SCANNER ---
+    function getFolderStats(dirPath) {
+        if (!fs.existsSync(dirPath)) return { count: 0, size: 0, time: 0 };
+        let count = 0; let size = 0; let time = fs.statSync(dirPath).mtimeMs;
+        try {
+            const items = fs.readdirSync(dirPath, { withFileTypes: true });
+            for (const item of items) {
+                const fullPath = path.join(dirPath, item.name);
+                if (item.isFile()) { count++; size += fs.statSync(fullPath).size; }
+                else if (item.isDirectory()) {
+                    const sub = getFolderStats(fullPath);
+                    count += sub.count; size += sub.size;
+                }
+            }
+        } catch(e) {}
+        return { count, size, time };
+    }
+
+    function getFolderStatsCached(dirPath, force = false) {
+        if (!force && cachedStats[dirPath]) return cachedStats[dirPath];
+        const result = getFolderStats(dirPath);
+        cachedStats[dirPath] = result;
+        try {
+            localStorage.setItem('md_cached_stats', JSON.stringify(cachedStats));
+        } catch (e) {
+            cachedStats = { [dirPath]: result }; 
+            localStorage.setItem('md_cached_stats', JSON.stringify(cachedStats));
+        }
+        return result;
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    // --- UNIVERSAL DRAG & DROP POSITION CALCULATOR ---
+    function handleDragOverIndicator(e, el, isGrid = false) {
+        e.preventDefault(); e.stopPropagation();
+        const rect = el.getBoundingClientRect();
+        
+        el.classList.remove('drag-top', 'drag-bottom', 'drag-left', 'drag-right', 'drag-over');
+        
+        if (isGrid) {
+            const x = e.clientX - rect.left;
+            if (x < rect.width * 0.25) el.classList.add('drag-left');
+            else if (x > rect.width * 0.75) el.classList.add('drag-right');
+            else el.classList.add('drag-over');
+        } else {
+            const y = e.clientY - rect.top;
+            if (y < rect.height * 0.25) el.classList.add('drag-top');
+            else if (y > rect.height * 0.75) el.classList.add('drag-bottom');
+            else el.classList.add('drag-over');
+        }
+    }
+
+    function processDropAction(e, el, arr, targetId, saveCallback, uiCallback) {
+        e.preventDefault(); e.stopPropagation();
+        try {
+            const isTop = el.classList.contains('drag-top') || el.classList.contains('drag-left');
+            const isBottom = el.classList.contains('drag-bottom') || el.classList.contains('drag-right');
+            el.classList.remove('drag-top', 'drag-bottom', 'drag-left', 'drag-right', 'drag-over');
+
+            if (dragSourceId !== null && dragSourceId !== targetId) {
+                const fromIdx = arr.findIndex(x => typeof x === 'object' ? x.path === dragSourceId : x === dragSourceId);
+                const toIdx = arr.findIndex(x => typeof x === 'object' ? x.path === targetId : x === targetId);
+                
+                if (fromIdx !== -1 && toIdx !== -1) {
+                    if (isTop || isBottom) {
+                        const draggedItem = arr.splice(fromIdx, 1)[0];
+                        const newToIdx = arr.findIndex(x => typeof x === 'object' ? x.path === targetId : x === targetId);
+                        if (isTop) arr.splice(newToIdx, 0, draggedItem);
+                        else arr.splice(newToIdx + 1, 0, draggedItem);
+                    } else {
+                        const temp = arr[fromIdx];
+                        arr[fromIdx] = arr[toIdx];
+                        arr[toIdx] = temp;
+                    }
+                    saveCallback(); uiCallback();
+                }
+            }
+        } catch (err) {
+            console.error("Drag swap error intercepted safely.", err);
+        } finally {
+            dragSourceType = null; dragSourceId = null;
+        }
+    }
+
+    // --- MEDIA LOGS ENGINE ---
+    let logSlotsRaw = JSON.parse(localStorage.getItem('md_log_slots'));
+    let logSlots = (logSlotsRaw && logSlotsRaw.length > 0) ? logSlotsRaw.filter(Boolean) : ['YouTube', 'X / Twitter', 'Instagram', 'Weverse', 'Pinterest', 'TikTok'];
+    let logsData = JSON.parse(localStorage.getItem('md_logs_data')) || {};
+
+    function saveLogs() {
+        localStorage.setItem('md_log_slots', JSON.stringify(logSlots));
+        localStorage.setItem('md_logs_data', JSON.stringify(logsData));
+    }
+
+    function addCustomLogSlot() {
+        document.getElementById('promptInput').value = "";
+        document.getElementById('promptModal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('promptInput').focus(), 50); 
+    }
+
+    function executeAddSlot(position = 'top') {
+        const slotName = document.getElementById('promptInput').value.trim();
+        if (slotName && !logSlots.includes(slotName)) {
+            if (position === 'bottom') {
+                logSlots.push(slotName);
+            } else {
+                logSlots.unshift(slotName);
+            }
+            saveLogs(); renderLogs();
+        }
+        document.getElementById('promptModal').classList.add('hidden');
+    }
+
+    let slotToRename = "";
+    function openRenameModal(oldName) {
+        slotToRename = oldName;
+        document.getElementById('renameInput').value = oldName;
+        document.getElementById('renameModal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('renameInput').focus(), 50); 
+    }
+
+    function executeRenameSlot() {
+        const newName = document.getElementById('renameInput').value.trim();
+        if (newName && newName !== slotToRename) {
+            if (logSlots.includes(newName)) {
+                alert("A tracking slot with this name already exists.");
+                return;
+            }
+            const idx = logSlots.indexOf(slotToRename);
+            if (idx !== -1) logSlots[idx] = newName;
+            
+            if (logsData[slotToRename]) {
+                logsData[newName] = logsData[slotToRename];
+                delete logsData[slotToRename];
+            }
+            
+            saveLogs();
+            renderLogs();
+        }
+        document.getElementById('renameModal').classList.add('hidden');
+    }
+
+    function clearLog(platform) {
+        if (logsData[platform] && logsData[platform].img) {
+            try { fs.unlinkSync(logsData[platform].img); } catch(e) {}
+        }
+        logsData[platform] = { img: '', date: 'Never' };
+        saveLogs(); renderLogs();
+    }
+
+    function removeLogSlot(platform) {
+        if (logsData[platform] && logsData[platform].img) {
+            try { fs.unlinkSync(logsData[platform].img); } catch(e) {}
+        }
+        logSlots = logSlots.filter(s => s !== platform);
+        delete logsData[platform];
+        saveLogs(); renderLogs();
+    }
+
+    function openImageModal(imgPath) {
+        const timeStamp = new Date().getTime();
+        document.getElementById('fullSizeImage').src = `file://${imgPath.replace(/\\/g, '/')}?t=${timeStamp}`;
+        document.getElementById('imageModal').classList.remove('hidden');
+    }
+
+    function saveLogImage(platform, file) {
+        const logsDir = path.join(__dirname, 'logs');
+        if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+
+        const ext = file.name ? path.extname(file.name) : '.png';
+        const safePlatform = platform.replace(/[^a-zA-Z0-9]/g, '_');
+        const destPath = path.join(logsDir, `${safePlatform}_log${ext}`);
+
+        const reader = new FileReader();
+        reader.onload = function() {
+            const buffer = Buffer.from(reader.result);
+            fs.writeFileSync(destPath, buffer);
+            logsData[platform] = { img: destPath, date: new Date().toLocaleString() };
+            saveLogs(); renderLogs();
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function renderLogs() {
+        const grid = document.getElementById('logsGrid');
+        grid.innerHTML = '';
+        
+        const sortMode = document.getElementById('logSort').value;
+        let sortedSlots = [...logSlots].map(platform => {
+            const data = logsData[platform] || { img: '', date: 'Never' };
+            const timestamp = data.date === 'Never' ? 0 : new Date(data.date).getTime();
+            return { platform, data, timestamp };
+        });
+
+        if (sortMode === 'newest') sortedSlots.sort((a, b) => b.timestamp - a.timestamp);
+        if (sortMode === 'az') sortedSlots.sort((a, b) => a.platform.localeCompare(b.platform));
+        if (sortMode === 'za') sortedSlots.sort((a, b) => b.platform.localeCompare(a.platform));
+
+        sortedSlots.forEach(item => {
+            const { platform, data } = item;
+            const card = document.createElement('div');
+            card.className = "log-card";
+
+            if (sortMode === 'custom') {
+                card.setAttribute('draggable', 'true');
+                card.addEventListener('dragstart', (e) => { e.stopPropagation(); dragSourceType = 'log'; dragSourceId = platform; });
+                card.addEventListener('dragover', (e) => { if(dragSourceType==='log') handleDragOverIndicator(e, card, true); });
+                card.addEventListener('dragleave', (e) => { if(dragSourceType==='log'){ e.stopPropagation(); card.classList.remove('drag-left','drag-right','drag-over'); }});
+                card.addEventListener('drop', (e) => {
+                    if (dragSourceType === 'log') processDropAction(e, card, logSlots, platform, saveLogs, renderLogs);
+                });
+            }
+
+            const title = document.createElement('div');
+            title.className = "log-title"; 
+            title.innerText = platform;
+            title.title = "Double-click to rename";
+            title.ondblclick = () => openRenameModal(platform);
+            card.appendChild(title);
+
+            const date = document.createElement('div');
+            date.className = "log-date";
+            date.innerText = "Last Updated: " + data.date;
+            card.appendChild(date);
+
+            const imgBox = document.createElement('div');
+            imgBox.className = "log-img-box";
+            imgBox.tabIndex = 0; 
+            
+            if (data.img && fs.existsSync(data.img)) {
+                const timeStamp = new Date().getTime(); 
+                imgBox.innerHTML = `<img src="file://${data.img.replace(/\\/g, '/')}?t=${timeStamp}" class="log-img">`;
+                imgBox.style.borderStyle = "solid"; imgBox.style.borderColor = "#333";
+                imgBox.title = "Double-click to expand image";
+            } else {
+                imgBox.innerHTML = `<span style="text-align:center; line-height: 1.5; pointer-events: none;">Select box, then Paste (Ctrl+V)<br>or Drag & Drop Image</span>`;
+                imgBox.title = "";
+            }
+
+            imgBox.ondblclick = (e) => {
+                e.stopPropagation();
+                if (data.img && fs.existsSync(data.img)) {
+                    openImageModal(data.img);
+                }
+            };
+
+            imgBox.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); imgBox.style.borderColor = '#aec6cf'; });
+            imgBox.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); imgBox.style.borderColor = data.img ? '#333' : '#444'; });
+            imgBox.addEventListener('drop', (e) => {
+                e.preventDefault(); e.stopPropagation(); imgBox.style.borderColor = data.img ? '#333' : '#444';
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    if (e.dataTransfer.files[0].type.startsWith('image/')) saveLogImage(platform, e.dataTransfer.files[0]);
+                }
+            });
+
+            imgBox.addEventListener('paste', (e) => {
+                e.preventDefault();
+                if (e.clipboardData && e.clipboardData.items) {
+                    for (let i = 0; i < e.clipboardData.items.length; i++) {
+                        if (e.clipboardData.items[i].type.indexOf('image') !== -1) {
+                            saveLogImage(platform, e.clipboardData.items[i].getAsFile());
+                            break;
+                        }
+                    }
+                }
+            });
+
+            card.appendChild(imgBox);
+
+            const actionBox = document.createElement('div');
+            actionBox.className = "log-actions";
+
+            if (data.img || data.date !== 'Never') {
+                const clearBtn = document.createElement('button');
+                clearBtn.className = "log-clear-btn"; clearBtn.innerText = "Clear";
+                clearBtn.onclick = () => showCustomConfirm("Clear Tracking Slot", `Clear completion data & image for ${platform}?`, "Clear", 'clearLog', platform, false);
+                actionBox.appendChild(clearBtn);
+            }
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = "icon-btn danger"; removeBtn.style.padding = "2px 6px"; removeBtn.innerText = "✕";
+            removeBtn.title = "Delete Slot"; 
+            removeBtn.onclick = () => showCustomConfirm("Delete Tracking Slot", `Permanently delete the ${platform} tracking slot?`, "Delete", 'removeLog', platform, true);
+            actionBox.appendChild(removeBtn);
+
+            card.appendChild(actionBox);
+            grid.appendChild(card);
+        });
+    }
+
+    // --- AUTO-UPDATE YT-DLP ON LAUNCH ---
+    function autoUpdateYtDlp() {
+        const ytdlp = getBinary('yt-dlp');
+        if (fs.existsSync(ytdlp)) {
+            const proc = spawn(ytdlp, ['-U']);
+            proc.stdout.on('data', d => {
+                const text = d.toString().trim();
+                if (text.includes('Updating') || text.includes('Updated')) logStatus("yt-dlp: " + text, "success");
+            });
+        }
+    }
+    autoUpdateYtDlp();
+
+    function forceSyncAllBins() {
+        favorites.forEach(f => getFolderStatsCached(f.path, true));
+        renderFavorites();
+    }
+
+    // --- SMART SYNC & AUTO-REFRESH ENGINE ---
+    function syncWorkspace(forceCacheRefresh = false) {
+        if (!activeProjectFolder || !fs.existsSync(activeProjectFolder)) return;
+        
+        const diskFolders = getSubfoldersRecursive(activeProjectFolder).map(f => f.replace(/\\/g, '/'));
+        let newFolders = diskFolders.filter(f => !subfolders.includes(f));
+        newFolders.sort((a, b) => getFolderStatsCached(path.join(activeProjectFolder, b), forceCacheRefresh).time - getFolderStatsCached(path.join(activeProjectFolder, a), forceCacheRefresh).time);
+        
+        subfolders = [...newFolders, ...subfolders.filter(f => diskFolders.includes(f))];
+        saveOrder();
+        updateGridUI(forceCacheRefresh); 
+    }
+
+    // Live update when shifting back to the window
+    window.addEventListener('focus', () => {
+        if (activeProjectFolder && !document.getElementById('workspaceSection').classList.contains('hidden')) {
+            syncWorkspace(true);
+        }
+        if (favorites.length > 0) {
+            const maxFiles = parseInt(document.getElementById('syncLimitFiles').value) || 2000;
+            const maxSize = (parseInt(document.getElementById('syncLimitMB').value) || 5000) * 1024 * 1024;
+            
+            let needsRender = false;
+            favorites.forEach(fav => {
+                const stats = cachedStats[fav.path] || {count: 0, size: 0};
+                if (stats.count <= maxFiles && stats.size <= maxSize) {
+                    getFolderStatsCached(fav.path, true);
+                    needsRender = true;
+                }
+            });
+            if (needsRender) renderFavorites();
+        }
+    });
+
+    // --- RIGHT CLICK PASTE ON TEXTAREA ENGINE ---
+    const linksBox = document.getElementById('links');
+    const textMenu = document.getElementById('textContextMenu');
+
+    linksBox.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        textMenu.style.left = e.clientX + 'px';
+        textMenu.style.top = e.clientY + 'px';
+        textMenu.classList.remove('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!textMenu.contains(e.target)) {
+            textMenu.classList.add('hidden');
+        }
+    });
+
+    async function pasteFromContextMenu() {
+        textMenu.classList.add('hidden');
+        try {
+            const text = await navigator.clipboard.readText();
+            if (text) {
+                linksBox.value = text;
+                logStatus("Pasted link from clipboard.");
+            }
+        } catch(err) {
+            logStatus("Clipboard read failed.", "warn");
+        }
+    }
+
+    // --- HARDENED DRAG & DROP EVENT BLOCKER ---
+    document.addEventListener('dragover', (e) => { if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes("Files")) e.preventDefault(); });
+    document.addEventListener('drop', (e) => { if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes("Files")) if (e.target.id !== 'dropZone' && e.target.id !== 'hiddenFileInput') e.preventDefault(); });
+
+    // --- MANUAL TEXTAREA DROP EXTRACTOR ---
+    linksBox.addEventListener('dragover', (e) => { e.preventDefault(); linksBox.classList.add('hover'); });
+    linksBox.addEventListener('dragleave', () => { linksBox.classList.remove('hover'); });
+    linksBox.addEventListener('drop', (e) => {
+        linksBox.classList.remove('hover');
+        const droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
+        if (droppedText) linksBox.value = droppedText;
+    });
+
+    // --- SETTINGS LOGIC ---
+    function saveSettings() {
+        const settings = {
+            alwaysOnTop: document.getElementById('alwaysOnTopToggle').checked,
+            isolate: document.getElementById('isolateToggle').checked,
+            autoOutput: document.getElementById('autoOutputToggle').checked,
+            copyFiles: document.getElementById('copyFilesToggle').checked,
+            autoDelZip: document.getElementById('autoDeleteZipToggle').checked,
+            focusExp: document.getElementById('focusExplorerToggle').checked,
+            syncLimitFiles: document.getElementById('syncLimitFiles').value,
+            syncLimitMB: document.getElementById('syncLimitMB').value,
+            browser: document.getElementById('browserSelect').value
+        };
+        localStorage.setItem('md_settings', JSON.stringify(settings));
+    }
+    
+    function loadSettings() {
+        const saved = JSON.parse(localStorage.getItem('md_settings'));
+        if (saved) {
+            document.getElementById('alwaysOnTopToggle').checked = saved.alwaysOnTop !== undefined ? saved.alwaysOnTop : false;
+            document.getElementById('isolateToggle').checked = saved.isolate;
+            document.getElementById('autoOutputToggle').checked = saved.autoOutput !== undefined ? saved.autoOutput : true;
+            document.getElementById('copyFilesToggle').checked = saved.copyFiles !== undefined ? saved.copyFiles : false;
+            document.getElementById('autoDeleteZipToggle').checked = saved.autoDelZip !== undefined ? saved.autoDelZip : true;
+            document.getElementById('focusExplorerToggle').checked = saved.focusExp !== undefined ? saved.focusExp : true;
+            document.getElementById('syncLimitFiles').value = saved.syncLimitFiles || 2000;
+            document.getElementById('syncLimitMB').value = saved.syncLimitMB || 5000;
+            document.getElementById('browserSelect').value = saved.browser || 'chrome';
+        } else {
+            document.getElementById('alwaysOnTopToggle').checked = false;
+            document.getElementById('autoOutputToggle').checked = true;
+            document.getElementById('copyFilesToggle').checked = false;
+            document.getElementById('autoDeleteZipToggle').checked = true;
+            document.getElementById('focusExplorerToggle').checked = true;
+            document.getElementById('syncLimitFiles').value = 2000;
+            document.getElementById('syncLimitMB').value = 5000;
+            document.getElementById('browserSelect').value = 'chrome';
+        }
+        applyAlwaysOnTop();
+    }
+
+    function applyAlwaysOnTop() {
+        const isPinned = document.getElementById('alwaysOnTopToggle').checked;
+        ipcRenderer.send('set-always-on-top', isPinned);
+    }
+
+    // --- UI HELPERS ---
+    function toggleOutput() {
+        const panel = document.getElementById('outputPanel');
+        isOutputOpen = !isOutputOpen;
+        if (isOutputOpen) panel.classList.add('open');
+        else panel.classList.remove('open');
+    }
+
+    function toggleInput(forceState = null) {
+        const panel = document.getElementById('inputPanel');
+        isInputOpen = forceState !== null ? forceState : !isInputOpen;
+        if (isInputOpen) panel.classList.add('open');
+        else panel.classList.remove('open');
+    }
+
+    function toggleFavs() {
+        const panel = document.getElementById('favPanel');
+        isFavsOpen = !isFavsOpen;
+        if (isFavsOpen) panel.classList.add('open');
+        else panel.classList.remove('open');
+    }
+    
+    function toggleAddFolder() {
+        const row = document.getElementById('addFolderRow');
+        row.classList.toggle('hidden');
+        if (!row.classList.contains('hidden')) {
+            document.getElementById('newFolderInput').value = "";
+            document.getElementById('newFolderInput').focus();
+        }
+    }
+
+    function setProgress(percent) {
+        document.getElementById('progressBar').style.width = percent + '%';
+        if (percent >= 100) setTimeout(() => document.getElementById('progressBar').style.width = '0%', 1500);
+    }
+
+    function logStatus(msg, type = "normal") {
+        if (msg.includes("No supported JavaScript runtime")) return;
+        if (msg.includes("No video formats found")) return;
+        if (msg.includes("No video could be found in this tweet")) return;
+
+        const box = document.getElementById('statusLog');
+        let colorClass = "";
+        if (type === "error") colorClass = "log-error";
+        if (type === "success") colorClass = "log-success";
+        if (type === "warn") colorClass = "log-warn";
+        box.innerHTML += `<br><span class="${colorClass}">> ${msg}</span>`;
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function openExplorer(targetPath) {
+        if (!fs.existsSync(targetPath)) {
+            logStatus(`Path does not exist: ${targetPath}`, "error");
+            return;
+        }
+        const focusOn = document.getElementById('focusExplorerToggle').checked;
+        if (focusOn) {
+            exec(`explorer "${targetPath}"`);
+        } else {
+            shell.openPath(targetPath);
+        }
+    }
+
+    // --- UNIFIED CONFIRM MODAL ENGINE ---
+    function showCustomConfirm(title, text, btnText, action, data, isDanger = true) {
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmTitle').style.color = isDanger ? "#ff5555" : "#aec6cf";
+        document.getElementById('confirmText').innerText = text;
+        const btn = document.getElementById('confirmBtn');
+        btn.innerText = btnText;
+        if (isDanger) {
+            btn.style.background = "#4a1515"; btn.style.color = "#ff9999"; btn.style.borderColor = "#ff5555";
+        } else {
+            btn.style.background = "#aec6cf"; btn.style.color = "#000"; btn.style.borderColor = "#aec6cf";
+        }
+        pendingAction = action;
+        pendingData = data;
+        document.getElementById('confirmModal').classList.remove('hidden');
+    }
+
+    function closeConfirmModal() {
+        document.getElementById('confirmModal').classList.add('hidden');
+        pendingAction = null; pendingData = null;
+    }
+
+    function executeConfirmAction() {
+        document.getElementById('confirmModal').classList.add('hidden');
+        try {
+            if (pendingAction === 'deleteFolder') {
+                const winPath = path.resolve(pendingData.path).replace(/\//g, '\\');
+                fs.rmSync(winPath, { recursive: true, force: true });
+                logStatus(`Permanently deleted '${pendingData.name}'.`, "warn");
+                if (pendingData.isProj) showLoading(loadProjects, "SCANNING PROJECTS...");
+                else syncWorkspace(true);
+            }
+            else if (pendingAction === 'removeFav') {
+                favorites.splice(pendingData, 1);
+                localStorage.setItem('md_favorites', JSON.stringify(favorites));
+                renderFavorites();
+            }
+            else if (pendingAction === 'clearLog') {
+                clearLog(pendingData);
+            }
+            else if (pendingAction === 'clearAllLogs') {
+                clearAllLogs();
+            }
+            else if (pendingAction === 'removeLog') {
+                removeLogSlot(pendingData);
+            }
+        } catch(e) {
+            logStatus(`Action failed: ${e.message}`, "error");
+        }
+        pendingAction = null; pendingData = null;
+    }
+
+    function deleteItemSafe(targetPath, itemName, isProject = false) {
+        showCustomConfirm("Confirm Delete", `Permanently delete '${itemName}' and ALL its contents? This cannot be undone.`, "Delete", 'deleteFolder', {path: targetPath, name: itemName, isProj: isProject}, true);
+    }
+
+    // --- ONE-CLICK FAVORITES LOGIC ---
+    async function addFavorite() {
+        const folder = await ipcRenderer.invoke('select-folder');
+        if (folder) {
+            if (favorites.some(f => f.path === folder)) {
+                logStatus(`Folder is already a Global Bin.`, "warn");
+                return;
+            }
+            const nickname = path.basename(folder).toUpperCase();
+            favorites.unshift({ name: nickname, path: folder }); 
+            localStorage.setItem('md_favorites', JSON.stringify(favorites));
+            
+            showLoading(() => {
+                getFolderStatsCached(folder, true);
+                renderFavorites();
+                logStatus(`Added Global Bin: ${nickname}`, "success");
+            }, "SCANNING BIN...");
+        }
+    }
+
+    function renderFavorites(forceRefresh = false) {
+        const grid = document.getElementById('favGrid');
+        grid.innerHTML = "";
+        
+        if (favorites.length === 0) {
+            grid.innerHTML = `<div style="text-align: center; color: #555; font-size: 12px; margin-top: 10px;">No bins added.</div>`;
+            return;
+        }
+
+        const sortMode = document.getElementById('favSort').value;
+        let sortedFavs = [...favorites].map(fav => { return { ...fav, stats: getFolderStatsCached(fav.path, forceRefresh) }; });
+
+        if (sortMode === 'newest') sortedFavs.sort((a, b) => b.stats.time - a.stats.time);
+        if (sortMode === 'oldest') sortedFavs.sort((a, b) => a.stats.time - b.stats.time);
+        if (sortMode === 'az') sortedFavs.sort((a, b) => a.name.localeCompare(b.name));
+        if (sortMode === 'za') sortedFavs.sort((a, b) => b.name.localeCompare(a.name));
+        if (sortMode === 'sizeHigh') sortedFavs.sort((a, b) => b.stats.size - a.stats.size);
+        if (sortMode === 'filesHigh') sortedFavs.sort((a, b) => b.stats.count - a.stats.count);
+
+        sortedFavs.forEach((fav) => {
+            const originalIndex = favorites.findIndex(f => f.path === fav.path);
+            const wrapper = document.createElement('div');
+            wrapper.className = "btn-wrapper";
+            
+            if (sortMode === 'custom') {
+                wrapper.setAttribute('draggable', 'true');
+                wrapper.addEventListener('dragstart', (e) => { e.stopPropagation(); dragSourceType = 'fav'; dragSourceId = fav.path; });
+                wrapper.addEventListener('dragover', (e) => { if(dragSourceType==='fav') handleDragOverIndicator(e, wrapper); });
+                wrapper.addEventListener('dragleave', (e) => { if(dragSourceType==='fav'){ e.stopPropagation(); wrapper.classList.remove('drag-top','drag-bottom','drag-over'); }});
+                wrapper.addEventListener('drop', (e) => {
+                    if(dragSourceType==='fav'){
+                        processDropAction(e, wrapper, favorites, fav.path, 
+                            () => localStorage.setItem('md_favorites', JSON.stringify(favorites)), 
+                            renderFavorites
+                        );
+                    }
+                });
+            }
+
+            const btn = document.createElement('button');
+            btn.className = "main-btn";
+            btn.innerHTML = `<div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px; overflow:hidden;">
+                                <span style="font-weight:bold; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">${fav.name}</span>
+                                <span style="color:#666; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${fav.stats.count} files | ${formatBytes(fav.stats.size)}</span>
+                             </div>`;
+            btn.title = "Download to " + fav.path;
+            btn.onclick = () => runDownload(fav.path, true);
+            
+            const openBtn = document.createElement('button');
+            openBtn.className = "icon-btn"; openBtn.innerText = "📁";
+            openBtn.title = "Open Folder";
+            openBtn.onclick = () => openExplorer(fav.path);
+
+            const delBtn = document.createElement('button');
+            delBtn.className = "icon-btn danger"; delBtn.innerText = "✕";
+            delBtn.title = "Remove Favorite";
+            delBtn.onclick = () => showCustomConfirm("Remove Global Bin", `Remove '${fav.name}' from favorites? (Files will NOT be deleted)`, "Remove", 'removeFav', originalIndex, false);
+
+            wrapper.appendChild(btn); wrapper.appendChild(openBtn); wrapper.appendChild(delBtn);
+            grid.appendChild(wrapper);
+        });
+    }
+
+    // --- DIRECTORY TOOLS ---
+    function getDirectoriesWithTime(sourcePath) {
+        if (!fs.existsSync(sourcePath)) return [];
+        return fs.readdirSync(sourcePath, { withFileTypes: true })
+            .filter(d => d.isDirectory())
+            .map(d => {
+                const fullPath = path.join(sourcePath, d.name);
+                return { name: d.name, time: fs.statSync(fullPath).birthtimeMs };
+            });
+    }
+
+    function getSubfoldersRecursive(dir, base = '') {
+        let results = [];
+        if (!fs.existsSync(dir)) return results;
+        const list = fs.readdirSync(dir, { withFileTypes: true });
+        list.forEach(file => {
+            if (file.isDirectory()) {
+                const relPath = path.join(base, file.name);
+                results.push(relPath);
+                results = results.concat(getSubfoldersRecursive(path.join(dir, file.name), relPath));
+            }
+        });
+        return results;
+    }
+
+    async function selectParentFolder() {
+        const folder = await ipcRenderer.invoke('select-folder');
+        if (folder) {
+            parentFolder = folder;
+            localStorage.setItem('md_workspace', parentFolder);
+            document.getElementById('parentPathDisplay').innerText = `Workspace: ${parentFolder}`;
+            showLoading(loadProjects, "SCANNING PROJECTS...");
+        }
+    }
+    
+    function resetToSetup() {
+        document.getElementById('projectSelectionSection').classList.add('hidden');
+        document.getElementById('setupSection').classList.remove('hidden');
+        toggleInput(false);
+    }
+
+    function loadProjects() {
+        document.getElementById('setupSection').classList.add('hidden');
+        document.getElementById('workspaceSection').classList.add('hidden');
+        document.getElementById('projectSelectionSection').classList.remove('hidden');
+        toggleInput(false);
+
+        const grid = document.getElementById('existingProjectsGrid');
+        grid.innerHTML = "";
+        
+        const term = document.getElementById('projectSearch').value.toLowerCase();
+        const sortMode = document.getElementById('projectSort').value;
+
+        let savedProjOrder = JSON.parse(localStorage.getItem('order_proj_' + parentFolder)) || [];
+        
+        let projects = getDirectoriesWithTime(parentFolder).map(p => {
+            p.stats = getFolderStatsCached(path.join(parentFolder, p.name));
+            return p;
+        });
+
+        let currentDiskNames = projects.map(p => p.name);
+        let newProjects = currentDiskNames.filter(n => !savedProjOrder.includes(n));
+        newProjects.sort((a,b) => getFolderStatsCached(path.join(parentFolder, b)).time - getFolderStatsCached(path.join(parentFolder, a)).time);
+        
+        savedProjOrder = [...newProjects, ...savedProjOrder.filter(n => currentDiskNames.includes(n))];
+        localStorage.setItem('order_proj_' + parentFolder, JSON.stringify(savedProjOrder));
+
+        let filteredProjects = projects.filter(p => p.name.toLowerCase().includes(term));
+
+        filteredProjects.sort((a, b) => {
+            if (sortMode === 'custom') return savedProjOrder.indexOf(a.name) - savedProjOrder.indexOf(b.name);
+            if (sortMode === 'newest') return b.time - a.time;
+            if (sortMode === 'oldest') return a.time - b.time;
+            if (sortMode === 'az') return a.name.localeCompare(b.name);
+            if (sortMode === 'za') return b.name.localeCompare(a.name);
+            if (sortMode === 'sizeHigh') return b.stats.size - a.stats.size;
+            if (sortMode === 'filesHigh') return b.stats.count - a.stats.count;
+            return 0;
+        });
+
+        if (filteredProjects.length === 0) {
+            grid.innerHTML = `<div style="grid-column: span 2; font-size: 12px; color: #555; text-align: center;">No projects match.</div>`;
+        } else {
+            filteredProjects.forEach(proj => {
+                const wrapper = document.createElement('div');
+                wrapper.className = "btn-wrapper";
+                
+                if (sortMode === 'custom') {
+                    wrapper.setAttribute('draggable', 'true');
+                    wrapper.addEventListener('dragstart', (e) => { e.stopPropagation(); dragSourceType = 'proj'; dragSourceId = proj.name; });
+                    wrapper.addEventListener('dragover', (e) => { if(dragSourceType==='proj') handleDragOverIndicator(e, wrapper); });
+                    wrapper.addEventListener('dragleave', (e) => { if(dragSourceType==='proj'){ e.stopPropagation(); wrapper.classList.remove('drag-top','drag-bottom','drag-over'); }});
+                    wrapper.addEventListener('drop', (e) => {
+                        if(dragSourceType==='proj'){
+                            processDropAction(e, wrapper, savedProjOrder, proj.name, 
+                                () => localStorage.setItem('order_proj_' + parentFolder, JSON.stringify(savedProjOrder)), 
+                                loadProjects
+                            );
+                        }
+                    });
+                }
+
+                const btn = document.createElement('button');
+                btn.className = "main-btn";
+                btn.innerHTML = `<span>${proj.name}</span> <span style="color:#666; font-size:10px;">(${proj.stats.count} files | ${formatBytes(proj.stats.size)})</span>`;
+                btn.title = "Open Project Workspace";
+                btn.onclick = () => showLoading(() => openProject(proj.name), "LOADING PROJECT...");
+                
+                const openBtn = document.createElement('button');
+                openBtn.className = "icon-btn"; openBtn.innerText = "📁";
+                openBtn.title = "Open Folder";
+                openBtn.onclick = () => openExplorer(path.join(parentFolder, proj.name));
+
+                const delBtn = document.createElement('button');
+                delBtn.className = "icon-btn danger"; delBtn.innerText = "✕";
+                delBtn.title = "Permanently Delete Project";
+                delBtn.onclick = () => deleteItemSafe(path.join(parentFolder, proj.name), proj.name, true);
+
+                wrapper.appendChild(btn); wrapper.appendChild(openBtn); wrapper.appendChild(delBtn);
+                grid.appendChild(wrapper);
+            });
+        }
+    }
+
+    function createProject() {
+        const projName = document.getElementById('projectNameInput').value.trim();
+        if (projName) showLoading(() => openProject(projName), "LOADING PROJECT...");
+    }
+    
+    function resetToProjects() {
+        document.getElementById('workspaceSection').classList.add('hidden');
+        document.getElementById('projectSearch').value = "";
+        toggleInput(false);
+        showLoading(loadProjects, "SCANNING PROJECTS...");
+    }
+
+    function openProject(projName) {
+        activeProjectFolder = path.join(parentFolder, projName);
+        if (!fs.existsSync(activeProjectFolder)) fs.mkdirSync(activeProjectFolder, { recursive: true });
+
+        // LOAD SAVED ORDER FOR THIS PROJECT BEFORE SYNCING
+        subfolders = JSON.parse(localStorage.getItem('order_' + activeProjectFolder)) || [];
+
+        document.getElementById('projectSelectionSection').classList.add('hidden');
+        document.getElementById('workspaceSection').classList.remove('hidden');
+        document.getElementById('activeProjectTitle').innerText = projName.toUpperCase();
+
+        syncWorkspace();
+        toggleInput(true);
+        logStatus(`Workspace: ${projName}`, "success");
+    }
+
+    function saveOrder() { localStorage.setItem('order_' + activeProjectFolder, JSON.stringify(subfolders)); }
+
+    function openTreePath(folderPath) {
+        const parts = folderPath.split('/');
+        let current = "";
+        for(let i=0; i<parts.length; i++) {
+            current += (i === 0 ? parts[i] : '/' + parts[i]);
+            openNestedFolders.add(current);
+        }
+    }
+
+    function createSubfolder() {
+        const folderName = document.getElementById('newFolderInput').value.trim().replace(/\\/g, '/');
+        if (!folderName) return;
+        const targetDir = path.join(activeProjectFolder, folderName);
+        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+
+        if (!subfolders.includes(folderName)) {
+            subfolders.unshift(folderName); 
+            openTreePath(folderName); 
+            saveOrder(); 
+            syncWorkspace(true);
+            logStatus(`Created Target: ${folderName}`);
+        }
+        document.getElementById('newFolderInput').value = "";
+        document.getElementById('addFolderRow').classList.add('hidden');
+    }
+
+    function toggleNested(parentName) {
+        const el = document.getElementById(`nested-${parentName.replace(/[^a-zA-Z0-9]/g, '')}`);
+        if (el) {
+            el.classList.toggle('open');
+            if (el.classList.contains('open')) openNestedFolders.add(parentName);
+            else openNestedFolders.delete(parentName);
+        }
+    }
+
+    // --- INFINITE DEPTH RECURSIVE CSS TREE RENDERING ---
+    function updateGridUI(forceRefresh = false) {
+        const grid = document.getElementById('folderGrid');
+        grid.innerHTML = "";
+        if (subfolders.length === 0) return;
+
+        const sortMode = document.getElementById('folderSort').value;
+        
+        let enrichedFolders = subfolders.map(f => {
+            return { name: f, stats: getFolderStatsCached(path.join(activeProjectFolder, f), forceRefresh) };
+        });
+
+        let rootFolders = [];
+        let childrenMap = {};
+
+        let allPaths = new Set(enrichedFolders.map(e => e.name));
+        enrichedFolders.forEach(e => {
+            let parts = e.name.split('/');
+            let p = "";
+            for(let i = 0; i < parts.length; i++) {
+                p += (i === 0 ? parts[i] : '/' + parts[i]);
+                allPaths.add(p);
+            }
+        });
+        
+        let sortedPaths = Array.from(allPaths);
+        
+        if (sortMode !== 'custom') {
+            sortedPaths.sort((a, b) => {
+                const statA = getFolderStatsCached(path.join(activeProjectFolder, a));
+                const statB = getFolderStatsCached(path.join(activeProjectFolder, b));
+                if (sortMode === 'az') return a.localeCompare(b);
+                if (sortMode === 'za') return b.localeCompare(a);
+                if (sortMode === 'newest') return statB.time - statA.time;
+                if (sortMode === 'oldest') return statA.time - statB.time;
+                if (sortMode === 'sizeHigh') return statB.size - statA.size;
+                if (sortMode === 'filesHigh') return statB.count - statA.count;
+                return 0;
+            });
+        }
+        
+        // Populate Tree Map
+        sortedPaths.forEach(f => {
+            const parts = f.split('/');
+            if (parts.length === 1) {
+                rootFolders.push(f);
+            } else {
+                const parent = parts.slice(0, -1).join('/');
+                if (!childrenMap[parent]) childrenMap[parent] = [];
+                if (!childrenMap[parent].includes(f)) childrenMap[parent].push(f);
+            }
+        });
+
+        if (sortMode === 'custom') {
+            let explicitRoots = subfolders.filter(f => !f.includes('/'));
+            sortedPaths.forEach(f => { if (!f.includes('/') && !explicitRoots.includes(f)) explicitRoots.push(f); });
+            rootFolders = explicitRoots;
+        }
+        
+        function buildNode(name, depth, parentEl) {
+            const wrapper = document.createElement('div');
+            wrapper.className = "btn-wrapper";
+
+            if (sortMode === 'custom') {
+                wrapper.setAttribute('draggable', 'true');
+                wrapper.addEventListener('dragstart', (e) => { e.stopPropagation(); dragSourceType = 'folder'; dragSourceId = name; });
+                wrapper.addEventListener('dragover', (e) => { if(dragSourceType==='folder') handleDragOverIndicator(e, wrapper); });
+                wrapper.addEventListener('dragleave', (e) => { if(dragSourceType==='folder'){ e.stopPropagation(); wrapper.classList.remove('drag-top','drag-bottom','drag-over'); }});
+                wrapper.addEventListener('drop', (e) => {
+                    if(dragSourceType==='folder'){
+                        processDropAction(e, wrapper, subfolders, name, saveOrder, updateGridUI);
+                    }
+                });
+            }
+
+            const enrichedData = enrichedFolders.find(e => e.name === name) || { stats: getFolderStatsCached(path.join(activeProjectFolder, name)) };
+            const displayName = depth === 0 ? name : "↳ " + name.split('/').pop();
+            
+            const btn = document.createElement('button');
+            btn.className = "main-btn";
+            btn.style.fontSize = depth === 0 ? "12px" : "11px";
+            btn.innerHTML = `<span>${displayName}</span> <span style="color:#666; font-size:10px;">(${enrichedData.stats.count} files | ${formatBytes(enrichedData.stats.size)})</span>`;
+            btn.title = "Download to " + name;
+            btn.onclick = () => runDownload(name);
+            wrapper.appendChild(btn);
+
+            const hasChildren = childrenMap[name] && childrenMap[name].length > 0;
+            
+            if (hasChildren) {
+                const dropBtn = document.createElement('button');
+                dropBtn.className = "icon-btn"; 
+                dropBtn.innerText = openNestedFolders.has(name) ? "▲" : "▼";
+                dropBtn.title = "Expand / Collapse Subfolders";
+                dropBtn.onclick = () => {
+                    toggleNested(name);
+                    dropBtn.innerText = openNestedFolders.has(name) ? "▲" : "▼";
+                };
+                wrapper.appendChild(dropBtn);
+            }
+            
+            const addSubBtn = document.createElement('button');
+            addSubBtn.className = "icon-btn"; addSubBtn.innerText = "+";
+            addSubBtn.title = "Create a Subfolder inside this folder";
+            addSubBtn.onclick = () => {
+                const row = document.getElementById('addFolderRow');
+                row.classList.remove('hidden');
+                const input = document.getElementById('newFolderInput');
+                input.value = name + '/';
+                input.focus();
+            };
+            wrapper.appendChild(addSubBtn);
+
+            const openBtn = document.createElement('button');
+            openBtn.className = "icon-btn"; openBtn.innerText = "📁";
+            openBtn.title = "Open Folder";
+            openBtn.onclick = () => openExplorer(path.join(activeProjectFolder, name));
+            wrapper.appendChild(openBtn);
+
+            const delBtn = document.createElement('button');
+            delBtn.className = "icon-btn danger"; delBtn.innerText = "✕";
+            delBtn.title = "Permanently Delete Folder";
+            delBtn.onclick = () => deleteItemSafe(path.join(activeProjectFolder, name), name, false);
+            wrapper.appendChild(delBtn);
+            
+            parentEl.appendChild(wrapper);
+
+            if (hasChildren) {
+                const nestedDiv = document.createElement('div');
+                nestedDiv.id = `nested-${name.replace(/[^a-zA-Z0-9]/g, '')}`;
+                nestedDiv.className = "nested-container";
+                if (openNestedFolders.has(name)) nestedDiv.classList.add('open');
+                
+                let childrenArray = childrenMap[name];
+                if (sortMode !== 'custom') {
+                    // Pre-sorted by the logic above
+                } else {
+                    childrenArray.sort((a, b) => subfolders.indexOf(a) - subfolders.indexOf(b)); 
+                }
+
+                childrenArray.forEach(child => {
+                    buildNode(child, depth + 1, nestedDiv);
+                });
+                parentEl.appendChild(nestedDiv);
+            }
+        }
+
+        rootFolders.forEach(name => {
+            const rootContainer = document.createElement('div');
+            rootContainer.className = "folder-group";
+            
+            buildNode(name, 0, rootContainer);
+            grid.appendChild(rootContainer);
+        });
+    }
+
+    // --- SECURE FILE STAGING ---
+    function stageFile(file) {
+        let p = "";
+        try { const { webUtils } = require('electron'); if (webUtils && webUtils.getPathForFile) p = webUtils.getPathForFile(file); } catch(e) {}
+        if (!p || p === "") p = file.path;
+        
+        if (p) {
+            stagedFile = p;
+            dropZone.innerText = "📦 " + file.name;
+        }
+    }
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('hiddenFileInput');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    fileInput.addEventListener('change', function() {
+        if (this.files[0]) stageFile(this.files[0]);
+    });
+
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('hover'); });
+    dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('hover'); });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault(); dropZone.classList.remove('hover');
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) stageFile(e.dataTransfer.files[0]);
+    });
+
+    function getBinary(name) { return path.join(__dirname, 'bin', `${name}.exe`); }
+
+    function attachStreamHandlers(proc, isGallery = false) {
+        proc.stdout.on('data', d => { 
+            const text = d.toString().trim();
+            if (isGallery) {
+                logStatus(text);
+            } else {
+                const pMatch = text.match(/\[download\]\s+(\d+\.?\d*)%/);
+                if (pMatch) setProgress(pMatch[1]);
+                if (text.includes('[download]') && !text.includes('Destination')) logStatus(text);
+            }
+        });
+        proc.stderr.on('data', d => {
+            const errText = d.toString().trim();
+            if (!errText.includes('JavaScript runtime') && !errText.includes('No video formats found') && !errText.includes('No video could be found') && errText.toLowerCase().includes('error')) {
+                logStatus(`Warning: ${errText}`, "warn");
+            }
+        });
+        proc.on('error', err => logStatus(`Process Error: ${err.message}`, "error"));
+    }
+
+    function runDownload(targetSubfolder, isAbsolute = false) {
+        try {
+            const autoOpen = document.getElementById('autoOutputToggle').checked;
+            const autoDelZip = document.getElementById('autoDeleteZipToggle').checked;
+            const isCopy = document.getElementById('copyFilesToggle').checked;
+
+            if (!isOutputOpen && autoOpen) toggleOutput();
+
+            const targetDir = isAbsolute ? targetSubfolder : path.join(activeProjectFolder, targetSubfolder);
+            const box = document.getElementById('links');
+            const nameBox = document.getElementById('customNameInput');
+            let rawUrl = box.value.trim();
+            let customName = nameBox.value.trim();
+            setProgress(0);
+
+            // 1. Local File Priority Engine
+            if (stagedFile) {
+                logStatus(`Processing file to [${path.basename(targetDir)}]...`);
+                if (stagedFile.toLowerCase().endsWith('.zip')) {
+                    
+                    let psCmd = `Expand-Archive -LiteralPath '${stagedFile}' -DestinationPath '${targetDir}' -Force`;
+                    if (autoDelZip) psCmd += `; Remove-Item -LiteralPath '${stagedFile}' -Force`;
+
+                    const proc = spawn('powershell.exe', ['-NoProfile', '-Command', psCmd]);
+                    proc.stdout.on('data', d => logStatus(d.toString().trim()));
+                    proc.stderr.on('data', d => {
+                        const errText = d.toString().trim();
+                        if (errText) logStatus(`ZIP Warn: ${errText}`, "warn");
+                    });
+                    proc.on('close', code => {
+                        logStatus(`ZIP Extracted Successfully.`, "success");
+                        setProgress(100);
+                        if (autoDelZip) logStatus(`Cleaned up original ZIP file.`, "warn");
+                        if (isAbsolute) renderFavorites(true); else syncWorkspace(true); 
+                    });
+                } else {
+                    const dest = path.join(targetDir, path.basename(stagedFile));
+                    fs.copyFileSync(stagedFile, dest);
+                    
+                    if (!isCopy) {
+                        try{ fs.unlinkSync(stagedFile); }catch(e){} 
+                        logStatus(`File moved successfully.`, "success");
+                    } else {
+                        logStatus(`File copied successfully.`, "success");
+                    }
+                    setProgress(100);
+                    if (isAbsolute) renderFavorites(true); else syncWorkspace(true); 
+                }
+                
+                stagedFile = ""; 
+                dropZone.innerHTML = "Click to browse, or<br>Drag & Drop ZIP / Local File"; 
+                box.value = ""; 
+                nameBox.value = "";
+                return;
+            }
+
+            if (!rawUrl) {
+                logStatus(`No valid link or file provided.`, "warn");
+                return;
+            }
+
+            // 2. Web Engine
+            let cleanUrl = rawUrl;
+            let index = null;
+            let isIsolated = document.getElementById('isolateToggle').checked;
+            let userBrowser = document.getElementById('browserSelect').value || 'chrome';
+
+            if (cleanUrl.includes('x.com') || cleanUrl.includes('twitter.com')) {
+                cleanUrl = cleanUrl.replace('x.com', 'twitter.com');
+                const match = cleanUrl.match(/\/(photo|video)\/(\d+)/i);
+                if (match) { index = match[2]; cleanUrl = cleanUrl.replace(/\/(photo|video)\/\d+/i, ''); }
+            }
+            if (cleanUrl.includes('instagram.com') && cleanUrl.includes('img_index=')) {
+                try {
+                    const urlObj = new URL(cleanUrl);
+                    index = urlObj.searchParams.get('img_index');
+                } catch(e) {}
+                cleanUrl = cleanUrl.split('?')[0];
+            }
+            if (cleanUrl.includes('tiktok.com')) cleanUrl = cleanUrl.split('?')[0];
+
+            let videoFormat = customName ? `${customName}.%(ext)s` : `%(title)s_%(id)s.%(ext)s`;
+            let imgFormat = customName ? `${customName}_{num}` : `{category}_{id}_{num}`; 
+            
+            if (cleanUrl.includes('instagram.com')) imgFormat = customName ? `${customName}_{num}` : `{category}_{shortcode}_{num}`;
+            if (cleanUrl.includes('twitter.com')) imgFormat = customName ? `${customName}_{num}` : `{category}_{tweet_id}_{num}`;
+
+            logStatus(`Fetching media -> [${path.basename(targetDir)}]`);
+            const ytdlp = getBinary('yt-dlp');
+            const gallerydl = getBinary('gallery-dl');
+
+            if (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be')) {
+                const proc = spawn(ytdlp, ['--no-playlist', '--ignore-errors', '-f', 'bestvideo+bestaudio/best', '--merge-output-format', 'mp4', '-o', path.join(targetDir, videoFormat), cleanUrl]);
+                attachStreamHandlers(proc, false);
+                proc.on('close', code => { if(code === 0) logStatus(`Download complete!`, "success"); setProgress(100); if (isAbsolute) renderFavorites(true); else syncWorkspace(true); });
+            } else if (cleanUrl.includes('tiktok.com')) {
+                const proc = spawn(ytdlp, ['--user-agent', 'abc', '--no-playlist', '--ignore-errors', '-f', 'bestvideo+bestaudio/best', '--merge-output-format', 'mp4', '-o', path.join(targetDir, videoFormat), cleanUrl]);
+                attachStreamHandlers(proc, false);
+                proc.on('close', code => { if(code === 0) logStatus(`TikTok Download complete!`, "success"); setProgress(100); if (isAbsolute) renderFavorites(true); else syncWorkspace(true); });
+            } else {
+                if (index && isIsolated) {
+                    const proc = spawn(gallerydl, ['--range', index, '--cookies-from-browser', userBrowser, '-D', targetDir, '-f', `${imgFormat}.{extension}`, cleanUrl]);
+                    attachStreamHandlers(proc, true);
+                    proc.on('close', () => { logStatus(`Isolated media saved.`, "success"); setProgress(100); if (isAbsolute) renderFavorites(true); else syncWorkspace(true); });
+                } else {
+                    const proc = spawn(ytdlp, ['--cookies-from-browser', userBrowser, '--ignore-errors', '-f', 'bestvideo+bestaudio/best', '--merge-output-format', 'mp4', '-o', path.join(targetDir, videoFormat), cleanUrl]);
+                    attachStreamHandlers(proc, false);
+                    proc.on('close', () => {
+                        const gProc = spawn(gallerydl, ['--cookies-from-browser', userBrowser, '--filter', "extension in ['jpg','jpeg','png','webp','gif']", '-D', targetDir, '-f', `${imgFormat}.{extension}`, cleanUrl]);
+                        attachStreamHandlers(gProc, true);
+                        gProc.on('close', () => { logStatus(`Media sync complete.`, "success"); setProgress(100); if (isAbsolute) renderFavorites(true); else syncWorkspace(true); });
+                    });
+                }
+            }
+            
+            box.value = ""; 
+            nameBox.value = "";
+        } catch (err) {
+            logStatus(`CRITICAL FAILURE: ${err.message}`, "error");
+        }
+    }
+</script>
+</body>
+</html>

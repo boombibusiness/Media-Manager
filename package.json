@@ -1,0 +1,14 @@
+{
+  "name": "media-downloader",
+  "version": "1.0.0",
+  "description": "Desktop Media Downloader for Editors",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^30.0.0"
+  }
+}
