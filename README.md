@@ -3,8 +3,8 @@ A standalone desktop application designed specifically to automate the grueling 
 
 it's built on top of `yt-dlp` & `gallery-dl`
 
-you can grab the packaged software here: 
-watch the full vid tutorial here to see all features in action:
+* you can grab the packaged software here: 
+* watch the full vid tutorial here to see all features in action:
 
 ## main ones:
 * **Universal Downloader:** Paste links from YouTube, X/Twitter, Instagram, TikTok, Pinterest or Photos from Weverse (I'm a K-pop editor lol) and the app automatically fetches the highest-quality video/audio available
