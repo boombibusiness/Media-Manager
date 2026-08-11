@@ -765,7 +765,8 @@
     }
 
     function saveLogImage(platform, file) {
-        const logsDir = path.join(__dirname, 'logs');
+        // --- NEW PERSISTENT PATH ---
+        const logsDir = path.join(require('os').homedir(), 'AppData', 'Roaming', 'MediaManagerLogs');
         if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 
         // Cleanup old image cache
@@ -870,7 +871,9 @@
                     
                     if (!image.isEmpty()) {
                         const buffer = image.toPNG();
-                        const logsDir = path.join(__dirname, 'logs');
+                        
+                        // --- NEW PERSISTENT PATH ---
+                        const logsDir = path.join(require('os').homedir(), 'AppData', 'Roaming', 'MediaManagerLogs');
                         if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
                         
                         if (logsData[platform] && logsData[platform].img && fs.existsSync(logsData[platform].img)) {
