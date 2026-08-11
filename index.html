@@ -294,8 +294,7 @@
                 <div style="font-size: 12px; color: #aaa; line-height: 1.8; text-align: left; background: #0a0a0a; padding: 25px; border-radius: 8px; border: 1px solid #222;">
                     <span style="color: #fff; font-weight: bold;">Video Tutorial:</span><br>Watch this guide for all the available functions:<br>
                     <!-- TUTORIAL LINK SLOT -->
-                    <a href="#" style="color: #aec6cf; text-decoration: none; word-break: break-all;">[INSERT LINK HERE]</a>
-                    
+                    <a href="#" onclick="require('electron').shell.openExternal('https://youtu.be/oisci5gtDCU'); return false;" style="color: #aec6cf; text-decoration: none; word-break: break-all;">https://youtu.be/oisci5gtDCU</a>
                     <br><br>
                     
                     <span style="color: #fff; font-weight: bold;">Supported Platforms:</span><br>
@@ -359,10 +358,10 @@
     <div id="inputTab" onclick="toggleInput()" title="Toggle Media Injector">MEDIA INPUT</div>
     <div class="input-container">
         <div class="input-column">
-            <textarea id="links" placeholder="Drag & Drop, or Paste highlighted link here..."></textarea>
+            <textarea id="links" placeholder="Paste link here (Ctrl+V or Right-Click)..."></textarea>
             <input type="text" id="customNameInput" placeholder="Override Name (Optional)...">
         </div>
-        <div id="dropZone" title="Click to open file explorer">Click to browse, or<br>Drag & Drop ZIP / Local File</div>
+        <div id="dropZone" title="Click to open file explorer">Click to browse, or<br>Drag & Drop Local Files or ZIPs here</div>
     </div>
 </div>
 
@@ -474,7 +473,7 @@
 </div>
 
 <script>
-    const { ipcRenderer, shell } = require('electron');
+    const { ipcRenderer, shell, clipboard } = require('electron');
     const { spawn, exec } = require('child_process');
     const path = require('path');
     const fs = require('fs');
@@ -769,9 +768,14 @@
         const logsDir = path.join(__dirname, 'logs');
         if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 
+        // Cleanup old image cache
+        if (logsData[platform] && logsData[platform].img && fs.existsSync(logsData[platform].img)) {
+            try { fs.unlinkSync(logsData[platform].img); } catch(err) {}
+        }
+
         const ext = file.name ? path.extname(file.name) : '.png';
         const safePlatform = platform.replace(/[^a-zA-Z0-9]/g, '_');
-        const destPath = path.join(logsDir, `${safePlatform}_log${ext}`);
+        const destPath = path.join(logsDir, `${safePlatform}_log_${Date.now()}${ext}`);
 
         const reader = new FileReader();
         reader.onload = function() {
@@ -829,13 +833,16 @@
             imgBox.className = "log-img-box";
             imgBox.tabIndex = 0; 
             
+            // MAGNETIC FOCUS
+            card.addEventListener('click', () => imgBox.focus());
+
             if (data.img && fs.existsSync(data.img)) {
                 const timeStamp = new Date().getTime(); 
                 imgBox.innerHTML = `<img src="file://${data.img.replace(/\\/g, '/')}?t=${timeStamp}" class="log-img">`;
                 imgBox.style.borderStyle = "solid"; imgBox.style.borderColor = "#333";
                 imgBox.title = "Double-click to expand image";
             } else {
-                imgBox.innerHTML = `<span style="text-align:center; line-height: 1.5; pointer-events: none;">Select box, then Paste (Ctrl+V)<br>or Drag & Drop Image</span>`;
+                imgBox.innerHTML = `<span style="text-align:center; line-height: 1.5; pointer-events: none;">Click anywhere here, then press (Ctrl+V)<br>or Drag & Drop Image</span>`;
                 imgBox.title = "";
             }
 
@@ -855,14 +862,29 @@
                 }
             });
 
-            imgBox.addEventListener('paste', (e) => {
-                e.preventDefault();
-                if (e.clipboardData && e.clipboardData.items) {
-                    for (let i = 0; i < e.clipboardData.items.length; i++) {
-                        if (e.clipboardData.items[i].type.indexOf('image') !== -1) {
-                            saveLogImage(platform, e.clipboardData.items[i].getAsFile());
-                            break;
+            // NATIVE ELECTRON CLIPBOARD INTERCEPT
+            imgBox.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+                    e.preventDefault(); e.stopPropagation();
+                    const image = clipboard.readImage();
+                    
+                    if (!image.isEmpty()) {
+                        const buffer = image.toPNG();
+                        const logsDir = path.join(__dirname, 'logs');
+                        if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+                        
+                        if (logsData[platform] && logsData[platform].img && fs.existsSync(logsData[platform].img)) {
+                            try { fs.unlinkSync(logsData[platform].img); } catch(err) {}
                         }
+
+                        const safePlatform = platform.replace(/[^a-zA-Z0-9]/g, '_');
+                        const destPath = path.join(logsDir, `${safePlatform}_log_${Date.now()}.png`);
+                        
+                        fs.writeFileSync(destPath, buffer);
+                        logsData[platform] = { img: destPath, date: new Date().toLocaleString() };
+                        saveLogs(); renderLogs();
+                    } else {
+                        logStatus("No image found in clipboard.", "warn");
                     }
                 }
             });
@@ -1677,7 +1699,7 @@
                 }
                 
                 stagedFile = ""; 
-                dropZone.innerHTML = "Click to browse, or<br>Drag & Drop ZIP / Local File"; 
+                dropZone.innerHTML = "Click to browse, or<br>Drag & Drop Local Files or ZIPs here"; 
                 box.value = ""; 
                 nameBox.value = "";
                 return;
