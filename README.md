@@ -3,7 +3,7 @@ A standalone desktop application designed specifically to automate the grueling 
 
 it's built on top of `yt-dlp` & `gallery-dl`
 
-* you can grab the packaged software here: 
+* you can grab the packaged software here: https://payhip.com/b/PNpva
 * watch the full vid tutorial here to see all features in action: https://youtu.be/oisci5gtDCU
 
 ## main ones:
