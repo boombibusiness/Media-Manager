@@ -15,8 +15,7 @@ it's built on top of `yt-dlp` & `gallery-dl`
 * **100% Local Processing:** No cloud servers, no databases. Everything runs directly on your machine.
 
 ## privacy & the "Browser Cookie" setting
-To download age-restricted or private posts and have an easier time downloading from Instagram, X/Twitter or Tiktok, the app needs to verify an active session. 
-^ **This app does not steal or transmit your cookies.** It operates completely locally. By selecting your "Primary Browser" in the App Settings, you are simply allowing the local `yt-dlp` engine to borrow your active login session to fetch the media directly to your hard drive. 
+To download age-restricted or private posts and have an easier time downloading from Instagram, X/Twitter or Tiktok, the app needs to verify an active session. **This app does not steal or transmit your cookies.** It operates completely locally. By selecting your "Primary Browser" in the App Settings, you are simply allowing the local `yt-dlp` engine to borrow your active login session to fetch the media directly to your hard drive. 
 
 ## for devs:
 If you want to read the code or run the app from source:
