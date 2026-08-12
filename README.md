@@ -4,6 +4,7 @@ A standalone desktop application designed specifically to automate the grueling 
 it's built on top of `yt-dlp` & `gallery-dl`
 
 * you can grab the packaged software here: https://payhip.com/b/PNpva
+* preview vid: https://youtu.be/rKnL458d3JU
 * watch the full vid tutorial here to see all features in action: https://youtu.be/oisci5gtDCU
 
 ## main ones:
@@ -26,4 +27,4 @@ If you want to read the code or run the app from source:
 5. Run `npm run build` to package your own `.exe` using electron-builder.
 
 ---
-*Created by [Yani/Boomb.i] - IG: @boomb.i_ | Email: boomb.ibusiness@gmail.com*
+*Created by Boomb.i - IG: @boomb.i_ | Email: boomb.ibusiness@gmail.com*
