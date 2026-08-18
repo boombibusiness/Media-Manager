@@ -324,6 +324,10 @@
                     <br><br>
                     
                     <span style="color: #e5c07b; font-weight: bold;">Note:</span> TikTok downloads can occasionally be inconsistent due to anti-scraping systems. If a download fails, simply retry the link.
+                    
+                    <br><br>
+                    
+                    <span style="color: #e5c07b; font-weight: bold;">Note:</span> MediaManager auto-updates its yt-dlp and gallery-dl engines every time it opens. If YouTube downloads suddenly start failing app-wide (e.g. an HTTP 403 error), it's almost always a temporary break on YouTube's end, not this app - this happens periodically to every yt-dlp-based tool. Relaunching in a day or two, once a fix ships upstream, usually resolves it.
                 </div>
             </div>
 
@@ -955,6 +959,11 @@
                 const text = d.toString().trim();
                 if (text.includes('Updating') || text.includes('Updated')) logStatus("yt-dlp: " + text, "success");
             });
+            proc.stderr.on('data', d => {
+                const text = d.toString().trim();
+                if (text) logStatus(`yt-dlp update check failed: ${text}`, "warn");
+            });
+            proc.on('error', err => logStatus(`yt-dlp update check failed to run: ${err.message}`, "warn"));
         }
     }
     autoUpdateYtDlp();
@@ -971,6 +980,11 @@
                 const text = d.toString().trim();
                 if (text) logStatus("gallery-dl: " + text, "success");
             });
+            proc.stderr.on('data', d => {
+                const text = d.toString().trim();
+                if (text) logStatus(`gallery-dl update check failed: ${text}`, "warn");
+            });
+            proc.on('error', err => logStatus(`gallery-dl update check failed to run: ${err.message}`, "warn"));
         }
     }
     autoUpdateGalleryDl();
