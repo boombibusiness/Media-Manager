@@ -1119,7 +1119,13 @@
             sel.disabled = true;
         } else {
             sel.disabled = false;
-            sel.value = sel.dataset.realValue || 'chrome';
+            // Only restore from dataset.realValue if we actually captured one this session
+            // (i.e. the user turned an override off at runtime). On a fresh page load with
+            // no override active, dataset.realValue was never set - falling back to 'chrome'
+            // here would silently overwrite the browser value that loadSettings() just set
+            // from the saved settings one line earlier. Leaving sel.value untouched in that
+            // case lets the loaded value stand.
+            if (sel.dataset.realValue) sel.value = sel.dataset.realValue;
         }
     }
 
