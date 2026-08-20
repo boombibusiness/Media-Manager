@@ -966,7 +966,12 @@
             proc.on('error', err => logStatus(`yt-dlp update check failed to run: ${err.message}`, "warn"));
         }
     }
-    autoUpdateYtDlp();
+    // Deferred rather than called immediately - spawning an external .exe right as the
+    // window is trying to paint/attach listeners is a plausible source of startup input
+    // lag, especially since a freshly-launched, unrecognized binary can get held up by
+    // antivirus scanning on first touch. This check isn't time-critical, so pushing it
+    // back costs nothing.
+    setTimeout(autoUpdateYtDlp, 1500);
 
     // --- AUTO-UPDATE GALLERY-DL ON LAUNCH ---
     // gallery-dl.exe previously had no update path at all, so it could stay on
@@ -987,7 +992,9 @@
             proc.on('error', err => logStatus(`gallery-dl update check failed to run: ${err.message}`, "warn"));
         }
     }
-    autoUpdateGalleryDl();
+    // Staggered a further 1.5s after yt-dlp's check, not fired in the same tick -
+    // two exe launches at once compounds the same startup contention.
+    setTimeout(autoUpdateGalleryDl, 3000);
 
     function forceSyncAllBins() {
         favorites.forEach(f => getFolderStatsCached(f.path, true));
@@ -1008,7 +1015,21 @@
     }
 
     // Live update when shifting back to the window
+    let lastFocusRefresh = 0;
     window.addEventListener('focus', () => {
+        // Debounced: getFolderStatsCached(..., true) bypasses the cache and walks the
+        // whole folder tree synchronously - for a project with thousands of files that's
+        // a very real, main-thread-blocking amount of work. The window regains OS focus
+        // constantly during normal use (including, it turns out, when a drag from outside
+        // brings it to the foreground), so forcing that full rescan on every single focus
+        // event was blocking long enough to visibly stall drag recognition and general
+        // input responsiveness on large projects. Skipping repeat refreshes within a short
+        // window keeps the "catch changes made while alt-tabbed away" intent without
+        // paying full price on every tab-switch.
+        const now = Date.now();
+        if (now - lastFocusRefresh < 15000) return;
+        lastFocusRefresh = now;
+
         if (activeProjectFolder && !document.getElementById('workspaceSection').classList.contains('hidden')) {
             syncWorkspace(true);
         }
@@ -1067,9 +1088,12 @@
     // file on every dragover tick while hovering is the leading suspect for the multi-second
     // hover lag on link drags specifically (Chromium/Windows resolving the virtual file's
     // content against the source browser). Requiring the ABSENCE of link-ish text formats
-    // makes this only fire for genuine local files. The 'drop' handler is unchanged in scope
-    // (still blocks stray files AND links from navigating the window) since it only runs once
-    // on release, not on every hover tick, so it was never the source of the lag.
+    // makes this only fire for genuine local files. The 'drop' handler below is exempted for
+    // 'links' specifically so its own handler (below) can own preventing default there directly -
+    // that handler must call e.preventDefault() itself, which it previously didn't (that gap was
+    // the actual cause of a since-fixed regression: X/image link drops briefly started opening a
+    // popup instead of just capturing the link, because narrowing this check removed the only
+    // thing that had accidentally been blocking it before).
     document.addEventListener('dragover', (e) => {
         const types = e.dataTransfer && e.dataTransfer.types;
         if (!types) return;
@@ -1089,6 +1113,9 @@
     linksBox.addEventListener('dragover', (e) => { e.preventDefault(); linksBox.classList.add('hover'); });
     linksBox.addEventListener('dragleave', () => { linksBox.classList.remove('hover'); });
     linksBox.addEventListener('drop', (e) => {
+        e.preventDefault(); // must call this here now - see note above; this handler is exempted
+        // from the document-level catch-all below, so it's the only thing standing between a
+        // dropped link and Electron's default "navigate to it" behavior for this specific target.
         linksBox.classList.remove('hover');
         const droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
         if (droppedText) linksBox.value = droppedText;
